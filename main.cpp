@@ -1,19 +1,153 @@
 #include <raylib.h>
 #include <iostream>
 #include <vector>
+#include <cmath>
 
 const int screenX = 1000;
 const int screenY = 1000;
 
-std::vector<float> calculateAngle(float playerX, float playerY, float cursorX, float cursorY)
-{
-    float dx, dy;
+// ============================================================
+// CALCUL DE DIRECTION
+// ============================================================
 
-    dx = (playerX - cursorX) / (playerX - cursorX);
-    dy = (playerY - cursorY) / (playerY - cursorY);
-    std::vector<float> angle = {dx, dy};
-    return angle;
+std::vector<float> calculateAngle(
+    float playerX,
+    float playerY,
+    float cursorX,
+    float cursorY)
+{
+    float dx = playerX - cursorX;
+    float dy = playerY - cursorY;
+
+    float distance = std::sqrt(dx * dx + dy * dy);
+
+    if (distance == 0)
+        return {0, 0};
+
+    dx /= distance;
+    dy /= distance;
+
+    return {dx, dy};
+}
+
+// ============================================================
+// PARTICULE
+// ============================================================
+
+class Particle
+{
+public:
+    float x;
+    float y;
+
+    float velocityX;
+    float velocityY;
+
+    float lifetime;
+    float maxLifetime;
+
+    float radius;
+
+    Color color;
+
+    Particle(
+        float startX,
+        float startY,
+        float startVelocityX,
+        float startVelocityY)
+    {
+        x = startX;
+        y = startY;
+
+        velocityX = startVelocityX;
+        velocityY = startVelocityY;
+
+        lifetime = 0.5f;
+        maxLifetime = 0.5f;
+
+        radius = 4.0f;
+
+        color = ORANGE;
+    }
+
+    void update(float dt)
+    {
+        x += velocityX * dt;
+        y += velocityY * dt;
+
+        lifetime -= dt;
+    }
+
+    bool isDead()
+    {
+        return lifetime <= 0;
+    }
+
+    void draw()
+    {
+        float alpha = lifetime / maxLifetime;
+
+        Color particleColor = color;
+
+        particleColor.a = (unsigned char)(255 * alpha);
+
+        DrawCircle(
+            x,
+            y,
+            radius,
+            particleColor);
+    }
 };
+
+// ============================================================
+// MUR
+// ============================================================
+
+class wall
+{
+public:
+    float x;
+    float y;
+
+    float height;
+    float width;
+
+    Color color;
+
+    bool colider;
+
+    wall(
+        float wallX,
+        float wallY,
+        float wallH,
+        float wallW,
+        Color wallColor)
+    {
+        x = wallX;
+        y = wallY;
+
+        height = wallH;
+        width = wallW;
+
+        color = wallColor;
+
+        colider = true;
+    }
+
+    void draw()
+    {
+        DrawRectangle(
+            x,
+            y,
+            height,
+            width,
+            color);
+    }
+};
+
+// ============================================================
+// JOUEUR
+// ============================================================
 
 class player
 {
@@ -25,94 +159,383 @@ public:
     // Taille
     float height;
     float width;
+
+    // Ancienne position
+    float previousX;
+    float previousY;
+
     // Physique
     float gravity;
+
+    float velocityX;
     float velocityY;
 
-    // Rebond
     float restitution;
 
-    // Couleur
     Color color;
-    // verifier si la colision s aplique
-    bool colider;
-    // Physique
-    float gravity;
-    float velocityY;
 
-    player(float playerX, float playerY, float playerH, float playerW, Color playerColor)
+    player(
+        float playerX,
+        float playerY,
+        float playerH,
+        float playerW,
+        Color playerColor)
     {
-        // Position
-        float x = playerX;
-        float y = playerY;
+        x = playerX;
+        y = playerY;
 
-        // Taille
-        float height = playerH;
-        float width = playerW;
-        // Couleur
-        Color color = playerColor;
+        height = playerH;
+        width = playerW;
+
+        previousX = x;
+        previousY = y;
+
+        color = playerColor;
 
         gravity = 500.0f;
+
+        velocityX = 0.0f;
         velocityY = 0.0f;
-    };
+
+        restitution = 0.8f;
+    }
+
+    // ========================================================
+    // UPDATE
+    // ========================================================
 
     void update(float dt)
     {
+        // On sauvegarde la position précédente
+        previousX = x;
+        previousY = y;
+
         // Gravité
         velocityY += gravity * dt;
 
         // Déplacement
+        x += velocityX * dt;
         y += velocityY * dt;
+
+        // Sol
+        if (y + height >= screenY)
+        {
+            y = screenY - height;
+
+            velocityY = 0.0f;
+            velocityX = 0.0f;
+        }
+
+        // Mur gauche
+        if (x < 0)
+        {
+            x = 0;
+            velocityX = 0;
+        }
+
+        // Mur droit
+        if (x + width > screenX)
+        {
+            x = screenX - width;
+            velocityX = 0;
+        }
     }
-    void pushBack(float cursorX, float cursorY)
+
+    // ========================================================
+    // REPOUSSE LE JOUEUR
+    // ========================================================
+
+    void pushBack(
+        float cursorX,
+        float cursorY)
     {
-        // la fonction pushback sert juste a calculer le pushback quand le joueur va clicker
-        std::vector<float> playerPushback = calculateAngle(x, y, cursorX, cursorY);
-        y = y - playerPushback[0];
-        x = x - playerPushback[1];
-    };
+        std::vector<float> direction =
+            calculateAngle(
+                x + width / 2,
+                y + height / 2,
+                cursorX,
+                cursorY);
+
+        float pushForce = 500.0f;
+
+        velocityX =
+            direction[0] * pushForce;
+
+        velocityY =
+            direction[1] * pushForce;
+    }
+
+    // ========================================================
+    // COLLISION AVEC UN MUR
+    // ========================================================
+
+    void checkWallCollision(wall &Wall)
+    {
+        // Joueur
+        float playerLeft = x;
+        float playerRight = x + width;
+
+        float playerTop = y;
+        float playerBottom = y + height;
+
+        // Mur
+        float wallLeft = Wall.x;
+        float wallRight = Wall.x + Wall.height;
+
+        float wallTop = Wall.y;
+        float wallBottom = Wall.y + Wall.width;
+
+        // Vérifie si les deux rectangles se touchent
+        bool collision =
+            playerRight > wallLeft &&
+            playerLeft < wallRight &&
+            playerBottom > wallTop &&
+            playerTop < wallBottom;
+
+        if (!collision)
+            return;
+
+        // ====================================================
+        // COLLISION PAR LE DESSUS
+        // ====================================================
+
+        float previousBottom =
+            previousY + height;
+
+        if (
+            previousBottom <= wallTop &&
+            velocityY >= 0)
+        {
+            y = wallTop - height;
+
+            velocityY = 0;
+            velocityX = 0;
+
+            return;
+        }
+
+        // ====================================================
+        // COLLISION PAR LE DESSOUS
+        // ====================================================
+
+        float previousTop =
+            previousY;
+
+        if (
+            previousTop >= wallBottom &&
+            velocityY < 0)
+        {
+            y = wallBottom;
+
+            velocityY = 0;
+
+            return;
+        }
+
+        // ====================================================
+        // COLLISION PAR LA GAUCHE
+        // ====================================================
+
+        float previousRight =
+            previousX + width;
+
+        if (
+            previousRight <= wallLeft &&
+            velocityX > 0)
+        {
+            x = wallLeft - width;
+
+            velocityX = 0;
+
+            return;
+        }
+
+        // ====================================================
+        // COLLISION PAR LA DROITE
+        // ====================================================
+
+        float previousLeft =
+            previousX;
+
+        if (
+            previousLeft >= wallRight &&
+            velocityX < 0)
+        {
+            x = wallRight;
+
+            velocityX = 0;
+
+            return;
+        }
+    }
+
+    // ========================================================
+    // ARME
+    // ========================================================
+
+    void drawWeapon()
+    {
+        Vector2 mouse =
+            GetMousePosition();
+
+        float centerX =
+            x + width / 2;
+
+        float centerY =
+            y + height / 2;
+
+        float dx =
+            mouse.x - centerX;
+
+        float dy =
+            mouse.y - centerY;
+
+        float angle =
+            atan2(dy, dx) * 180.0f / PI;
+
+        float weaponLength = 50.0f;
+
+        float weaponWidth = 10.0f;
+
+        Rectangle weapon =
+            {
+                centerX,
+                centerY - weaponWidth / 2,
+                weaponLength,
+                weaponWidth};
+
+        Vector2 origin =
+            {
+                0,
+                weaponWidth / 2};
+
+        DrawRectanglePro(
+            weapon,
+            origin,
+            angle,
+            DARKGRAY);
+    }
+
+    // ========================================================
+    // FIN DE L'ARME
+    // ========================================================
+
+    Vector2 getWeaponEnd()
+    {
+        Vector2 mouse =
+            GetMousePosition();
+
+        float centerX =
+            x + width / 2;
+
+        float centerY =
+            y + height / 2;
+
+        float dx =
+            mouse.x - centerX;
+
+        float dy =
+            mouse.y - centerY;
+
+        float distance =
+            sqrt(
+                dx * dx +
+                dy * dy);
+
+        if (distance == 0)
+        {
+            dx = 1;
+            dy = 0;
+        }
+        else
+        {
+            dx /= distance;
+            dy /= distance;
+        }
+
+        float weaponLength = 50.0f;
+
+        Vector2 weaponEnd;
+
+        weaponEnd.x =
+            centerX +
+            dx * weaponLength;
+
+        weaponEnd.y =
+            centerY +
+            dy * weaponLength;
+
+        return weaponEnd;
+    }
+
+    // ========================================================
+    // DESSIN DU JOUEUR
+    // ========================================================
 
     void draw()
     {
-        DrawRectangle(x, y, height, width, color);
-        DrawCircle(x, y + 10, height + height / 10, color);
-    };
+        // Corps
+        DrawRectangle(
+            x,
+            y,
+            width,
+            height,
+            color);
+
+        // Tête
+        DrawCircle(
+            x + width / 2,
+            y,
+            width / 2,
+            color);
+
+        // Arme
+        drawWeapon();
+    }
 };
+
+// ============================================================
+// BALLE
+// ============================================================
 
 class Ball
 {
 public:
-    // Position
     float x;
     float y;
 
-    // Taille
     float radius;
 
-    // Physique
     float gravity;
+
     float velocityY;
 
-    // Rebond
     float restitution;
 
-    // Couleur
     Color color;
-    // verifier si la colision s aplique
-    bool colider;
-    // Constructeur
 
-    Ball(float startX, float startY, float startRadius, Color startColor)
+    bool colider;
+
+    Ball(
+        float startX,
+        float startY,
+        float startRadius,
+        Color startColor)
     {
         x = startX;
         y = startY;
+
         radius = startRadius;
+
         color = startColor;
 
         gravity = 500.0f;
+
         velocityY = 0.0f;
 
         restitution = 0.8f;
+
+        colider = true;
     }
 
     void update(float dt)
@@ -128,83 +551,288 @@ public:
         {
             y = screenY - radius;
 
-            // Rebond
-            velocityY = -velocityY * restitution;
+            velocityY =
+                -velocityY * restitution;
         }
     }
 
     void draw()
     {
-        DrawCircle(x, y, radius, color);
+        DrawCircle(
+            x,
+            y,
+            radius,
+            color);
     }
 };
-class wall
-{
-public:
-    float x;
-    float y;
-    float height;
-    float width;
-    Color color;
-    bool colider;
-    wall(float wallX, float wallY, float wallH, float wallW, Color wallColor)
-    {
-        x = wallX;
-        y = wallY;
-        height = wallH;
-        width = wallW;
-        color = wallColor;
-        colider = true;
-    };
 
-    // fonctions
-    void draw()
+// ============================================================
+// PARTICULES DE TIR
+// ============================================================
+
+void shootParticles(
+    std::vector<Particle> &particles,
+    player &Player)
+{
+    Vector2 mouse =
+        GetMousePosition();
+
+    float centerX =
+        Player.x +
+        Player.width / 2;
+
+    float centerY =
+        Player.y +
+        Player.height / 2;
+
+    float dx =
+        mouse.x - centerX;
+
+    float dy =
+        mouse.y - centerY;
+
+    float distance =
+        sqrt(
+            dx * dx +
+            dy * dy);
+
+    if (distance == 0)
+        return;
+
+    dx /= distance;
+    dy /= distance;
+
+    Vector2 weaponEnd =
+        Player.getWeaponEnd();
+
+    for (int i = 0; i < 8; i++)
     {
-        DrawRectangle(x, y, height, width, color);
-    };
-};
+        float randomX =
+            (float)GetRandomValue(
+                -30,
+                30) /
+            10.0f;
+
+        float randomY =
+            (float)GetRandomValue(
+                -30,
+                30) /
+            10.0f;
+
+        float speed =
+            GetRandomValue(
+                100,
+                250);
+
+        float velocityX =
+            dx * speed +
+            randomX;
+
+        float velocityY =
+            dy * speed +
+            randomY;
+
+        particles.emplace_back(
+            weaponEnd.x,
+            weaponEnd.y,
+            velocityX,
+            velocityY);
+    }
+}
+
+// ============================================================
+// MAIN
+// ============================================================
 
 int main()
 {
-    InitWindow(screenX, screenY, "Physics Simulator");
+    // ========================================================
+    // FENÊTRE
+    // ========================================================
 
-    // Liste de toutes les balles
+    InitWindow(
+        screenX,
+        screenY,
+        "Physics Simulator");
+
+    SetTargetFPS(60);
+
+    // ========================================================
+    // JOUEUR
+    // ========================================================
+
+    player Player(
+        500,
+        300,
+        50,
+        30,
+        BLUE);
+
+    // ========================================================
+    // BALLES
+    // ========================================================
+
     std::vector<Ball> balls;
-    // Première balle
-    balls.emplace_back(500, 125, 20, RED);
+
+    balls.emplace_back(
+        500,
+        125,
+        20,
+        RED);
+
+    // ========================================================
+    // MURS
+    // ========================================================
 
     std::vector<wall> walls;
-    walls.emplace_back(500, 125, 20, 10, RED);
+
+    // Mur horizontal vert
+    walls.emplace_back(
+        400,
+        600,
+        200,
+        30,
+        GREEN);
+
+    // Mur horizontal rouge
+    walls.emplace_back(
+        700,
+        400,
+        200,
+        30,
+        RED);
+
+    // Mur vertical orange
+    walls.emplace_back(
+        100,
+        100,
+        30,
+        300,
+        ORANGE);
+
+    // ========================================================
+    // PARTICULES
+    // ========================================================
+
+    std::vector<Particle> particles;
+
+    // ========================================================
+    // BOUCLE PRINCIPALE
+    // ========================================================
 
     while (!WindowShouldClose())
     {
-        float dt = GetFrameTime();
+        // Delta time
+        float dt =
+            GetFrameTime();
 
-        // pour ajouter une balle il faut faire balls.emplace_back(position.x,position.y,20,GREEN)
-        // pour compiler  g++ main.cpp -o main.exe -IC:/msys64/ucrt64/include -LC:/msys64/ucrt64/lib -lraylib -lopengl32 -lgdi32 -lwinmm
+        // ====================================================
+        // TIR
+        // ====================================================
 
-        // Mise à jour de toutes les balles
+        if (
+            IsMouseButtonPressed(
+                MOUSE_BUTTON_LEFT))
+        {
+            // Particules
+            shootParticles(
+                particles,
+                Player);
+
+            // Repousse le joueur
+            Vector2 mouse =
+                GetMousePosition();
+
+            Player.pushBack(
+                mouse.x,
+                mouse.y);
+        }
+
+        // ====================================================
+        // UPDATE JOUEUR
+        // ====================================================
+
+        Player.update(dt);
+
+        // ====================================================
+        // COLLISION JOUEUR / MURS
+        // ====================================================
+
+        for (wall &Wall : walls)
+        {
+            Player.checkWallCollision(
+                Wall);
+        }
+
+        // ====================================================
+        // UPDATE BALLES
+        // ====================================================
+
         for (Ball &ball : balls)
         {
             ball.update(dt);
         }
 
-        // Dessin
+        // ====================================================
+        // UPDATE PARTICULES
+        // ====================================================
+
+        for (Particle &particle : particles)
+        {
+            particle.update(dt);
+        }
+
+        // ====================================================
+        // SUPPRESSION DES PARTICULES MORTES
+        // ====================================================
+
+        for (
+            int i = particles.size() - 1;
+            i >= 0;
+            i--)
+        {
+            if (particles[i].isDead())
+            {
+                particles.erase(
+                    particles.begin() + i);
+            }
+        }
+
+        // ====================================================
+        // DESSIN
+        // ====================================================
+
         BeginDrawing();
 
         ClearBackground(BLACK);
 
-        // Dessiner toutes les balles
+        // Joueur
+        Player.draw();
+
+        // Balles
         for (Ball &ball : balls)
         {
             ball.draw();
         }
-        for (wall &wall : walls)
+
+        // Murs
+        for (wall &Wall : walls)
         {
-            wall.draw();
+            Wall.draw();
         }
+
+        // Particules
+        for (Particle &particle : particles)
+        {
+            particle.draw();
+        }
+
         EndDrawing();
     }
+
+    // ========================================================
+    // FERMETURE
+    // ========================================================
 
     CloseWindow();
 
