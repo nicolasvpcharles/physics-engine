@@ -1,4 +1,9 @@
-Playground
+# Playground
+
+
+
+
+
 ---
 Petit simulateur de physique 2D développé en C++ avec Raylib.
 Le projet permet de simuler différents objets soumis à une physique simple : gravité, vitesse, collisions et rebonds.
