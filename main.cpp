@@ -5,6 +5,80 @@
 const int screenX = 1000;
 const int screenY = 1000;
 
+std::vector<float> calculateAngle(float playerX, float playerY, float cursorX, float cursorY)
+{
+    float dx, dy;
+
+    dx = (playerX - cursorX) / (playerX - cursorX);
+    dy = (playerY - cursorY) / (playerY - cursorY);
+    std::vector<float> angle = {dx, dy};
+    return angle;
+};
+
+class player
+{
+public:
+    // Position
+    float x;
+    float y;
+
+    // Taille
+    float height;
+    float width;
+    // Physique
+    float gravity;
+    float velocityY;
+
+    // Rebond
+    float restitution;
+
+    // Couleur
+    Color color;
+    // verifier si la colision s aplique
+    bool colider;
+    // Physique
+    float gravity;
+    float velocityY;
+
+    player(float playerX, float playerY, float playerH, float playerW, Color playerColor)
+    {
+        // Position
+        float x = playerX;
+        float y = playerY;
+
+        // Taille
+        float height = playerH;
+        float width = playerW;
+        // Couleur
+        Color color = playerColor;
+
+        gravity = 500.0f;
+        velocityY = 0.0f;
+    };
+
+    void update(float dt)
+    {
+        // Gravité
+        velocityY += gravity * dt;
+
+        // Déplacement
+        y += velocityY * dt;
+    }
+    void pushBack(float cursorX, float cursorY)
+    {
+        // la fonction pushback sert juste a calculer le pushback quand le joueur va clicker
+        std::vector<float> playerPushback = calculateAngle(x, y, cursorX, cursorY);
+        y = y - playerPushback[0];
+        x = x - playerPushback[1];
+    };
+
+    void draw()
+    {
+        DrawRectangle(x, y, height, width, color);
+        DrawCircle(x, y + 10, height + height / 10, color);
+    };
+};
+
 class Ball
 {
 public:
@@ -27,6 +101,7 @@ public:
     // verifier si la colision s aplique
     bool colider;
     // Constructeur
+
     Ball(float startX, float startY, float startRadius, Color startColor)
     {
         x = startX;
