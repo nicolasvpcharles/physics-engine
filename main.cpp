@@ -3,15 +3,17 @@
 #include <vector>
 #include <cmath>
 #include <chrono>
+#include <string>
 #include <cstdlib>
 // taille de l ecran
 const int screenX = 1500;
-const int screenY = 1100;
-
+const int screenY = 1000;
+// nombres de fps
+const int targetFps = 60;
 // autres variables
 
 int numberOfEnemies = 1;
-
+long long score = 0;
 // ============================================================
 // CALCUL DE DIRECTION
 // ============================================================
@@ -177,7 +179,7 @@ public:
     float velocityY;
 
     float restitution;
-
+    float health;
     Color color;
 
     player(
@@ -185,6 +187,7 @@ public:
         float playerY,
         float playerH,
         float playerW,
+
         Color playerColor)
     {
         x = playerX;
@@ -197,7 +200,7 @@ public:
         previousY = y;
 
         color = playerColor;
-
+        health = 100;
         gravity = 500.0f;
 
         velocityX = 0.0f;
@@ -230,6 +233,7 @@ public:
 
             velocityY = 0.0f;
             velocityX = 0.0f;
+            health = health - 1;
         }
 
         // Mur gauche
@@ -244,6 +248,12 @@ public:
         {
             x = screenX - width;
             velocityX = 0;
+        }
+        // Plafond
+        if (y < 0)
+        {
+            y = 0;
+            velocityY = 0;
         }
     }
 
@@ -262,7 +272,7 @@ public:
                 cursorX,
                 cursorY);
 
-        float pushForce = 500.0f;
+        float pushForce = 400.0f;
 
         velocityX =
             direction[0] * pushForce;
@@ -739,12 +749,22 @@ int main()
     // FENÊTRE
     // ========================================================
 
+    //  InitWindow(screenX,screenY,"Physics Simulator");
+    ////////////////////////
+
+    SetConfigFlags(FLAG_FULLSCREEN_MODE);
+
     InitWindow(
-        screenX,
-        screenY,
+        0,
+        0,
         "Physics Simulator");
 
-    SetTargetFPS(60);
+    int screenX = GetScreenWidth();
+    int screenY = GetScreenHeight();
+
+    //////////////////
+    SetTargetFPS(targetFps);
+    SetConfigFlags(FLAG_FULLSCREEN_MODE);
 
     // ========================================================
     // JOUEUR
@@ -848,9 +868,10 @@ int main()
             {
                 enemies.emplace_back(
                     std::rand() % screenY,
-                    screenX + std::rand() % screenX / 100,
+                    screenX + std::rand() % screenX / 20,
                     5,
                     PURPLE);
+                score = score + numberOfEnemies;
                 i = i + 1;
             };
             if (numberOfEnemies < 20)
@@ -989,6 +1010,35 @@ int main()
             particle.draw();
         }
 
+        //=======================================================
+        // TEXTE
+        //=======================================================
+
+        std::string scoreMessage = "ton score " + std::to_string(score);
+        DrawText(scoreMessage.c_str(), screenX / 2, 0, 25, WHITE);
+
+        std::string fpsText = "FPS : " + std::to_string((int)(1.0f / dt));
+
+        DrawText(
+            fpsText.c_str(),
+            screenX - 100,
+            20,
+            15,
+            WHITE);
+
+        // afficher le texte de la vie
+        std::string playerHealth = std::to_string(int(Player.health));
+        DrawText(
+            playerHealth.c_str(),
+            0 + screenX / 100,
+            20,
+            25,
+            RED
+
+        );
+
+        // dt
+
         // ====================================================
         // ENNEMIS
         // ====================================================
@@ -999,13 +1049,30 @@ int main()
         }
 
         EndDrawing();
+
+        // vefier si la hitbox du joueur est la mm que celle de l enemi
+        for (enemyA &enemy : enemies)
+        {
+            if (
+                Player.x < enemy.x + enemy.radius &&
+                Player.x + Player.width > enemy.x - enemy.radius &&
+                Player.y < enemy.y + enemy.radius &&
+                Player.y + Player.height > enemy.y - enemy.radius)
+            {
+                std::cout << "COLLISION !" << std::endl;
+                Player.health = Player.health - 10;
+            };
+        };
+        // verifier si la vie est en dessous de 100
+        if (Player.health < 0)
+        {
+            CloseWindow();
+        };
+        // ========================================================
+        // FERMETURE
+        // ========================================================
     }
-
-    // ========================================================
-    // FERMETURE
-    // ========================================================
-
     CloseWindow();
 
     return 0;
-}
+};
