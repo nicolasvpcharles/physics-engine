@@ -2,9 +2,15 @@
 #include <iostream>
 #include <vector>
 #include <cmath>
+#include <chrono>
+#include <cstdlib>
+// taille de l ecran
+const int screenX = 1500;
+const int screenY = 1100;
 
-const int screenX = 1000;
-const int screenY = 1000;
+// autres variables
+
+int numberOfEnemies = 1;
 
 // ============================================================
 // CALCUL DE DIRECTION
@@ -345,6 +351,8 @@ public:
         {
             x = wallLeft - width;
 
+            velocityY = velocityY / 2;
+
             velocityX = 0;
 
             return;
@@ -362,6 +370,8 @@ public:
             velocityX < 0)
         {
             x = wallRight;
+
+            velocityY = velocityY / 2;
 
             velocityX = 0;
 
@@ -641,6 +651,85 @@ void shootParticles(
 }
 
 // ============================================================
+// ENNEMI
+// ============================================================
+
+class enemyA
+{
+public:
+    float x;
+    float y;
+
+    float radius;
+
+    float gravity;
+
+    float velocityY;
+
+    float restitution;
+
+    Color color;
+
+    bool colider;
+
+    // ========================================================
+    // CONSTRUCTEUR
+    // ========================================================
+
+    enemyA(
+        float enemyY,
+        float enemyX,
+        float enemyRadius,
+        Color enemyColor)
+    {
+        x = enemyX;
+        y = enemyY;
+
+        radius = enemyRadius;
+
+        color = enemyColor;
+
+        gravity = 500.0f;
+
+        velocityY = 0.0f;
+
+        restitution = 0.8f;
+
+        colider = true;
+    }
+
+    // ========================================================
+    // DESSIN
+    // ========================================================
+
+    void draw()
+    {
+        DrawCircle(
+            x,
+            y,
+            radius,
+            color);
+    }
+
+    // ========================================================
+    // UPDATE
+    // ========================================================
+
+    void update()
+    {
+        // Déplacement horizontal
+        x = x - 1;
+
+        // Plus tard :
+        // - collision avec le joueur
+        // - collision avec les murs
+        // - gravité
+        // - attaque
+        // - etc.
+    }
+};
+
+// ============================================================
 // MAIN
 // ============================================================
 
@@ -717,12 +806,64 @@ int main()
     std::vector<Particle> particles;
 
     // ========================================================
+    // ENNEMIS
+    // ========================================================
+
+    std::vector<enemyA> enemies;
+
+    // ========================================================
+    // CHRONOMETRE
+    // ========================================================
+
+    auto lastEvent =
+        std::chrono::steady_clock::now();
+
+    // ========================================================
     // BOUCLE PRINCIPALE
     // ========================================================
 
     while (!WindowShouldClose())
     {
-        // Delta time
+        // ====================================================
+        // CHRONOMETRE
+        // ====================================================
+
+        auto now =
+            std::chrono::steady_clock::now();
+
+        auto elapsed =
+            std::chrono::duration_cast<std::chrono::seconds>(
+                now - lastEvent);
+
+        // Spawn toutes les 5 secondes
+        if (elapsed.count() >= 5)
+        {
+            std::cout
+                << "spawn d un enemi"
+                << std::endl;
+
+            int i = 0;
+            int n = std::rand() % numberOfEnemies;
+            while (i != n)
+            {
+                enemies.emplace_back(
+                    std::rand() % screenY,
+                    screenX + std::rand() % screenX / 100,
+                    5,
+                    PURPLE);
+                i = i + 1;
+            };
+            if (numberOfEnemies < 20)
+            {
+                numberOfEnemies = numberOfEnemies + 1;
+            };
+            lastEvent = now;
+        }
+
+        // ====================================================
+        // DELTA TIME
+        // ====================================================
+
         float dt =
             GetFrameTime();
 
@@ -783,6 +924,15 @@ int main()
         }
 
         // ====================================================
+        // UPDATE ENNEMIS
+        // ====================================================
+
+        for (enemyA &enemy : enemies)
+        {
+            enemy.update();
+        }
+
+        // ====================================================
         // SUPPRESSION DES PARTICULES MORTES
         // ====================================================
 
@@ -806,25 +956,46 @@ int main()
 
         ClearBackground(BLACK);
 
-        // Joueur
+        // ====================================================
+        // JOUEUR
+        // ====================================================
+
         Player.draw();
 
-        // Balles
+        // ====================================================
+        // BALLES
+        // ====================================================
+
         for (Ball &ball : balls)
         {
             ball.draw();
         }
 
-        // Murs
+        // ====================================================
+        // MURS
+        // ====================================================
+
         for (wall &Wall : walls)
         {
             Wall.draw();
         }
 
-        // Particules
+        // ====================================================
+        // PARTICULES
+        // ====================================================
+
         for (Particle &particle : particles)
         {
             particle.draw();
+        }
+
+        // ====================================================
+        // ENNEMIS
+        // ====================================================
+
+        for (enemyA &enemy : enemies)
+        {
+            enemy.draw();
         }
 
         EndDrawing();
