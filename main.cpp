@@ -5,15 +5,22 @@
 #include <chrono>
 #include <string>
 #include <cstdlib>
-// taille de l ecran
-const int screenX = 1500;
-const int screenY = 1000;
-// nombres de fps
+
+// ============================================================
+// TAILLE DE L'ECRAN
+// ============================================================
+
+int screenX = 0;
+int screenY = 0;
+
 const int targetFps = 60;
-// autres variables
 
 int numberOfEnemies = 1;
+int maxEnemies = 20;
+
 long long score = 0;
+
+bool colisions=true;
 // ============================================================
 // CALCUL DE DIRECTION
 // ============================================================
@@ -27,7 +34,8 @@ std::vector<float> calculateAngle(
     float dx = playerX - cursorX;
     float dy = playerY - cursorY;
 
-    float distance = std::sqrt(dx * dx + dy * dy);
+    float distance =
+        std::sqrt(dx * dx + dy * dy);
 
     if (distance == 0)
         return {0, 0};
@@ -93,11 +101,16 @@ public:
 
     void draw()
     {
-        float alpha = lifetime / maxLifetime;
+        float alpha =
+            lifetime / maxLifetime;
+
+        if (alpha < 0)
+            alpha = 0;
 
         Color particleColor = color;
 
-        particleColor.a = (unsigned char)(255 * alpha);
+        particleColor.a =
+            (unsigned char)(255 * alpha);
 
         DrawCircle(
             x,
@@ -160,26 +173,29 @@ public:
 class player
 {
 public:
-    // Position
     float x;
     float y;
 
-    // Taille
     float height;
     float width;
 
-    // Ancienne position
     float previousX;
     float previousY;
 
-    // Physique
     float gravity;
 
     float velocityX;
     float velocityY;
 
+    int bulets;
+    int maxBulets;
+
     float restitution;
     float health;
+
+    // Cooldown entre deux dégâts
+    float damageCooldown;
+
     Color color;
 
     player(
@@ -187,7 +203,6 @@ public:
         float playerY,
         float playerH,
         float playerW,
-
         Color playerColor)
     {
         x = playerX;
@@ -200,13 +215,20 @@ public:
         previousY = y;
 
         color = playerColor;
+
         health = 100;
+
         gravity = 500.0f;
 
         velocityX = 0.0f;
         velocityY = 0.0f;
 
         restitution = 0.8f;
+
+        bulets = 5;
+        maxBulets = 5;
+
+        damageCooldown = 0;
     }
 
     // ========================================================
@@ -215,9 +237,17 @@ public:
 
     void update(float dt)
     {
-        // On sauvegarde la position précédente
         previousX = x;
         previousY = y;
+
+        // Cooldown dégâts
+        if (damageCooldown > 0)
+        {
+            damageCooldown -= dt;
+
+            if (damageCooldown < 0)
+                damageCooldown = 0;
+        }
 
         // Gravité
         velocityY += gravity * dt;
@@ -226,33 +256,53 @@ public:
         x += velocityX * dt;
         y += velocityY * dt;
 
-        // Sol
+        // ====================================================
+        // SOL
+        // ====================================================
+
         if (y + height >= screenY)
         {
             y = screenY - height;
 
-            velocityY = 0.0f;
-            velocityX = 0.0f;
-            health = health - 1;
+            velocityY = 0;
+            velocityX = 0;
+
+            health -= 1;
+
+            if (health < 0)
+                health = 0;
         }
 
-        // Mur gauche
+        // ====================================================
+        // MUR GAUCHE
+        // ====================================================
+
         if (x < 0)
         {
             x = 0;
+
             velocityX = 0;
         }
 
-        // Mur droit
+        // ====================================================
+        // MUR DROIT
+        // ====================================================
+
         if (x + width > screenX)
         {
             x = screenX - width;
+
             velocityX = 0;
         }
-        // Plafond
+
+        // ====================================================
+        // PLAFOND
+        // ====================================================
+
         if (y < 0)
         {
             y = 0;
+
             velocityY = 0;
         }
     }
@@ -287,21 +337,20 @@ public:
 
     void checkWallCollision(wall &Wall)
     {
-        // Joueur
         float playerLeft = x;
         float playerRight = x + width;
 
         float playerTop = y;
         float playerBottom = y + height;
 
-        // Mur
         float wallLeft = Wall.x;
-        float wallRight = Wall.x + Wall.height;
+        float wallRight =
+            Wall.x + Wall.height;
 
         float wallTop = Wall.y;
-        float wallBottom = Wall.y + Wall.width;
+        float wallBottom =
+            Wall.y + Wall.width;
 
-        // Vérifie si les deux rectangles se touchent
         bool collision =
             playerRight > wallLeft &&
             playerLeft < wallRight &&
@@ -312,7 +361,7 @@ public:
             return;
 
         // ====================================================
-        // COLLISION PAR LE DESSUS
+        // DESSUS
         // ====================================================
 
         float previousBottom =
@@ -331,7 +380,7 @@ public:
         }
 
         // ====================================================
-        // COLLISION PAR LE DESSOUS
+        // DESSOUS
         // ====================================================
 
         float previousTop =
@@ -349,7 +398,7 @@ public:
         }
 
         // ====================================================
-        // COLLISION PAR LA GAUCHE
+        // GAUCHE
         // ====================================================
 
         float previousRight =
@@ -361,7 +410,8 @@ public:
         {
             x = wallLeft - width;
 
-            velocityY = velocityY / 2;
+            velocityY =
+                velocityY / 2;
 
             velocityX = 0;
 
@@ -369,7 +419,7 @@ public:
         }
 
         // ====================================================
-        // COLLISION PAR LA DROITE
+        // DROITE
         // ====================================================
 
         float previousLeft =
@@ -381,7 +431,8 @@ public:
         {
             x = wallRight;
 
-            velocityY = velocityY / 2;
+            velocityY =
+                velocityY / 2;
 
             velocityX = 0;
 
@@ -411,10 +462,11 @@ public:
             mouse.y - centerY;
 
         float angle =
-            atan2(dy, dx) * 180.0f / PI;
+            atan2(dy, dx) *
+            180.0f /
+            PI;
 
         float weaponLength = 50.0f;
-
         float weaponWidth = 10.0f;
 
         Rectangle weapon =
@@ -489,12 +541,11 @@ public:
     }
 
     // ========================================================
-    // DESSIN DU JOUEUR
+    // DESSIN
     // ========================================================
 
     void draw()
     {
-        // Corps
         DrawRectangle(
             x,
             y,
@@ -502,14 +553,12 @@ public:
             height,
             color);
 
-        // Tête
         DrawCircle(
             x + width / 2,
             y,
             width / 2,
             color);
 
-        // Arme
         drawWeapon();
     }
 };
@@ -527,7 +576,6 @@ public:
     float radius;
 
     float gravity;
-
     float velocityY;
 
     float restitution;
@@ -537,42 +585,40 @@ public:
     bool colider;
 
     Ball(
-        float startX,
-        float startY,
-        float startRadius,
-        Color startColor)
+        float ballX,
+        float ballY,
+        float ballRadius,
+        Color ballColor)
     {
-        x = startX;
-        y = startY;
+        x = ballX;
+        y = ballY;
 
-        radius = startRadius;
-
-        color = startColor;
+        radius = ballRadius;
 
         gravity = 500.0f;
 
-        velocityY = 0.0f;
+        velocityY = 0;
 
         restitution = 0.8f;
+
+        color = ballColor;
 
         colider = true;
     }
 
     void update(float dt)
     {
-        // Gravité
         velocityY += gravity * dt;
 
-        // Déplacement
         y += velocityY * dt;
 
-        // Collision avec le sol
         if (y >= screenY - radius)
         {
             y = screenY - radius;
 
             velocityY =
-                -velocityY * restitution;
+                -velocityY *
+                restitution;
         }
     }
 
@@ -587,7 +633,7 @@ public:
 };
 
 // ============================================================
-// PARTICULES DE TIR
+// TIR DE PARTICULES
 // ============================================================
 
 void shootParticles(
@@ -628,21 +674,13 @@ void shootParticles(
     for (int i = 0; i < 8; i++)
     {
         float randomX =
-            (float)GetRandomValue(
-                -30,
-                30) /
-            10.0f;
+            GetRandomValue(-30, 30) / 10.0f;
 
         float randomY =
-            (float)GetRandomValue(
-                -30,
-                30) /
-            10.0f;
+            GetRandomValue(-30, 30) / 10.0f;
 
         float speed =
-            GetRandomValue(
-                100,
-                250);
+            GetRandomValue(100, 250);
 
         float velocityX =
             dx * speed +
@@ -673,7 +711,6 @@ public:
     float radius;
 
     float gravity;
-
     float velocityY;
 
     float restitution;
@@ -681,10 +718,6 @@ public:
     Color color;
 
     bool colider;
-
-    // ========================================================
-    // CONSTRUCTEUR
-    // ========================================================
 
     enemyA(
         float enemyY,
@@ -697,15 +730,26 @@ public:
 
         radius = enemyRadius;
 
-        color = enemyColor;
-
         gravity = 500.0f;
 
-        velocityY = 0.0f;
+        velocityY = 0;
 
         restitution = 0.8f;
 
+        color = enemyColor;
+
         colider = true;
+    }
+
+    // ========================================================
+    // UPDATE ENNEMI
+    // ========================================================
+
+    void update(float dt)
+    {
+        float speed = 60.0f;
+
+        x -= speed * dt;
     }
 
     // ========================================================
@@ -720,23 +764,6 @@ public:
             radius,
             color);
     }
-
-    // ========================================================
-    // UPDATE
-    // ========================================================
-
-    void update()
-    {
-        // Déplacement horizontal
-        x = x - 1;
-
-        // Plus tard :
-        // - collision avec le joueur
-        // - collision avec les murs
-        // - gravité
-        // - attaque
-        // - etc.
-    }
 };
 
 // ============================================================
@@ -746,33 +773,54 @@ public:
 int main()
 {
     // ========================================================
-    // FENÊTRE
+    // FENETRE
     // ========================================================
 
-    //  InitWindow(screenX,screenY,"Physics Simulator");
-    ////////////////////////
-
-    SetConfigFlags(FLAG_FULLSCREEN_MODE);
-
     InitWindow(
-        0,
-        0,
+        1280,
+        720,
         "Physics Simulator");
 
-    int screenX = GetScreenWidth();
-    int screenY = GetScreenHeight();
+    // ========================================================
+    // MONITEUR
+    // ========================================================
 
-    //////////////////
+    int monitorWidth =
+        GetMonitorWidth(0);
+
+    int monitorHeight =
+        GetMonitorHeight(0);
+
+    // ========================================================
+    // FULLSCREEN WINDOWED
+    // ========================================================
+
+    SetWindowState(
+        FLAG_WINDOW_UNDECORATED);
+
+    SetWindowSize(
+        monitorWidth,
+        monitorHeight);
+
+    SetWindowPosition(
+        0,
+        0);
+
+    screenX =
+        GetScreenWidth();
+
+    screenY =
+        GetScreenHeight();
+
     SetTargetFPS(targetFps);
-    SetConfigFlags(FLAG_FULLSCREEN_MODE);
 
     // ========================================================
     // JOUEUR
     // ========================================================
 
     player Player(
-        500,
-        300,
+        screenX / 2,
+        screenY / 3,
         50,
         30,
         BLUE);
@@ -784,10 +832,10 @@ int main()
     std::vector<Ball> balls;
 
     balls.emplace_back(
-        500,
+        screenX / 2,
         125,
         20,
-        RED);
+        GRAY);
 
     // ========================================================
     // MURS
@@ -795,28 +843,25 @@ int main()
 
     std::vector<wall> walls;
 
-    // Mur horizontal vert
     walls.emplace_back(
-        400,
-        600,
-        200,
+        screenX * 0.26f,
+        screenY * 0.60f,
+        screenX * 0.13f,
         30,
         GREEN);
 
-    // Mur horizontal rouge
     walls.emplace_back(
-        700,
-        400,
-        200,
+        screenX * 0.46f,
+        screenY * 0.40f,
+        screenX * 0.13f,
         30,
         RED);
 
-    // Mur vertical orange
     walls.emplace_back(
-        100,
-        100,
+        screenX * 0.06f,
+        screenY * 0.10f,
         30,
-        300,
+        screenY * 0.30f,
         ORANGE);
 
     // ========================================================
@@ -832,11 +877,23 @@ int main()
     std::vector<enemyA> enemies;
 
     // ========================================================
-    // CHRONOMETRE
+    // CHRONOMETRES
     // ========================================================
 
-    auto lastEvent =
+    auto lastEnemySpawn =
         std::chrono::steady_clock::now();
+
+    auto lastBulletRecharge =
+        std::chrono::steady_clock::now();
+
+    auto event =
+        std::chrono::steady_clock::now();
+
+    // ========================================================
+    // FULLSCREEN
+    // ========================================================
+
+    bool trueFullscreen = false;
 
     // ========================================================
     // BOUCLE PRINCIPALE
@@ -845,40 +902,145 @@ int main()
     while (!WindowShouldClose())
     {
         // ====================================================
-        // CHRONOMETRE
+        // F11
+        // ====================================================
+
+        if (IsKeyPressed(KEY_F11))
+        {
+            if (!trueFullscreen)
+            {
+                ToggleFullscreen();
+
+                trueFullscreen = true;
+            }
+            else
+            {
+                ToggleFullscreen();
+
+                SetWindowState(
+                    FLAG_WINDOW_UNDECORATED);
+
+                SetWindowSize(
+                    monitorWidth,
+                    monitorHeight);
+
+                SetWindowPosition(
+                    0,
+                    0);
+
+                trueFullscreen = false;
+            }
+
+            screenX =
+                GetScreenWidth();
+
+            screenY =
+                GetScreenHeight();
+        }
+
+        // ====================================================
+        // TEMPS ACTUEL
         // ====================================================
 
         auto now =
             std::chrono::steady_clock::now();
 
-        auto elapsed =
-            std::chrono::duration_cast<std::chrono::seconds>(
-                now - lastEvent);
+        // ====================================================
+        // SPAWN DES ENNEMIS
+        // ====================================================
 
-        // Spawn toutes les 5 secondes
-        if (elapsed.count() >= 5)
+        auto enemyElapsed =
+            std::chrono::duration_cast<
+                std::chrono::seconds>(
+                now - lastEnemySpawn);
+
+        if (enemyElapsed.count() >= 5)
         {
             std::cout
-                << "spawn d un enemi"
+                << "Spawn d'un ennemi"
                 << std::endl;
 
             int i = 0;
-            int n = std::rand() % numberOfEnemies;
-            while (i != n)
+
+            int n =
+                1 +
+                std::rand() %
+                    numberOfEnemies;
+
+            while (i < n)
             {
                 enemies.emplace_back(
                     std::rand() % screenY,
-                    screenX + std::rand() % screenX / 20,
+
+                    screenX +
+                        std::rand() %
+                            (screenX / 20),
+
                     5,
+
                     PURPLE);
-                score = score + numberOfEnemies;
-                i = i + 1;
-            };
-            if (numberOfEnemies < 20)
+
+                i++;
+            }
+
+            // Augmente progressivement
+            // le nombre maximum d'ennemis
+
+            if (numberOfEnemies < maxEnemies)
             {
-                numberOfEnemies = numberOfEnemies + 1;
-            };
-            lastEvent = now;
+                numberOfEnemies++;
+            }
+            score += numberOfEnemies;
+            lastEnemySpawn = now;
+        }
+
+        // ====================================================
+        // EVENEMENT BOSS
+        // ====================================================
+
+        auto eventSpawnBoss =
+            std::chrono::duration_cast<
+                std::chrono::seconds>(
+                now - event);
+
+        if (eventSpawnBoss.count() >= 30)
+        {
+            std::cout
+                << "================================"
+                << std::endl;
+
+            std::cout
+                << "       EVENT BOSS SPAWN !"
+                << std::endl;
+
+            std::cout
+                << "================================"
+                << std::endl;
+
+            // IMPORTANT :
+            // on reset le timer
+
+            event = now;
+        }
+
+        // ====================================================
+        // RECHARGE DES BALLES
+        // ====================================================
+
+        auto bulletElapsed =
+            std::chrono::duration_cast<
+                std::chrono::seconds>(
+                now - lastBulletRecharge);
+
+        if (bulletElapsed.count() >= 1)
+        {
+            if (Player.bulets <
+                Player.maxBulets)
+            {
+                Player.bulets++;
+            }
+
+            lastBulletRecharge = now;
         }
 
         // ====================================================
@@ -896,18 +1058,21 @@ int main()
             IsMouseButtonPressed(
                 MOUSE_BUTTON_LEFT))
         {
-            // Particules
-            shootParticles(
-                particles,
-                Player);
+            if (Player.bulets > 0)
+            {
+                shootParticles(
+                    particles,
+                    Player);
 
-            // Repousse le joueur
-            Vector2 mouse =
-                GetMousePosition();
+                Vector2 mouse =
+                    GetMousePosition();
 
-            Player.pushBack(
-                mouse.x,
-                mouse.y);
+                Player.pushBack(
+                    mouse.x,
+                    mouse.y);
+
+                Player.bulets--;
+            }
         }
 
         // ====================================================
@@ -950,11 +1115,61 @@ int main()
 
         for (enemyA &enemy : enemies)
         {
-            enemy.update();
+            enemy.update(dt);
         }
 
         // ====================================================
-        // SUPPRESSION DES PARTICULES MORTES
+        // COLLISION JOUEUR / ENNEMIS
+        // ====================================================
+
+        for (enemyA &enemy : enemies)
+        {
+            bool collision =
+                Player.x <
+                    enemy.x +
+                        enemy.radius &&
+
+                Player.x +
+                        Player.width >
+                    enemy.x -
+                        enemy.radius &&
+
+                Player.y <
+                    enemy.y +
+                        enemy.radius &&
+
+                Player.y +
+                        Player.height >
+                    enemy.y -
+                        enemy.radius;
+
+            if (collision)
+            {
+                // Seulement si le cooldown
+                // est terminé
+
+                if (Player.damageCooldown <= 0)
+                {
+                    std::cout
+                        << "COLLISION !"
+                        << std::endl;
+
+                    Player.health -= 10;
+
+                    if (Player.health < 0)
+                        Player.health = 0;
+
+                    // 0.5 seconde
+                    // d'invincibilité
+
+                    Player.damageCooldown =
+                        0.5f;
+                }
+            }
+        }
+
+        // ====================================================
+        // SUPPRESSION PARTICULES
         // ====================================================
 
         for (
@@ -967,6 +1182,33 @@ int main()
                 particles.erase(
                     particles.begin() + i);
             }
+        }
+
+        // ====================================================
+        // SUPPRESSION ENNEMIS
+        // ====================================================
+
+        for (
+            int i = enemies.size() - 1;
+            i >= 0;
+            i--)
+        {
+            if (enemies[i].x < 0)
+            {
+                enemies.erase(
+                    enemies.begin() + i);
+            }
+        }
+
+        // ====================================================
+        // GAME OVER
+        // ====================================================
+
+        if (Player.health <= 0)
+        {
+            CloseWindow();
+
+            return 0;
         }
 
         // ====================================================
@@ -1010,35 +1252,6 @@ int main()
             particle.draw();
         }
 
-        //=======================================================
-        // TEXTE
-        //=======================================================
-
-        std::string scoreMessage = "ton score " + std::to_string(score);
-        DrawText(scoreMessage.c_str(), screenX / 2, 0, 25, WHITE);
-
-        std::string fpsText = "FPS : " + std::to_string((int)(1.0f / dt));
-
-        DrawText(
-            fpsText.c_str(),
-            screenX - 100,
-            20,
-            15,
-            WHITE);
-
-        // afficher le texte de la vie
-        std::string playerHealth = std::to_string(int(Player.health));
-        DrawText(
-            playerHealth.c_str(),
-            0 + screenX / 100,
-            20,
-            25,
-            RED
-
-        );
-
-        // dt
-
         // ====================================================
         // ENNEMIS
         // ====================================================
@@ -1048,31 +1261,119 @@ int main()
             enemy.draw();
         }
 
-        EndDrawing();
+        // ====================================================
+        // SCORE
+        // ====================================================
 
-        // vefier si la hitbox du joueur est la mm que celle de l enemi
-        for (enemyA &enemy : enemies)
+        std::string scoreMessage =
+            "Score : " +
+            std::to_string(score);
+
+        DrawText(
+            scoreMessage.c_str(),
+            screenX / 2,
+            0,
+            25,
+            WHITE);
+
+        // ====================================================
+        // FPS
+        // ====================================================
+
+        int fps = 0;
+
+        if (dt > 0)
         {
-            if (
-                Player.x < enemy.x + enemy.radius &&
-                Player.x + Player.width > enemy.x - enemy.radius &&
-                Player.y < enemy.y + enemy.radius &&
-                Player.y + Player.height > enemy.y - enemy.radius)
-            {
-                std::cout << "COLLISION !" << std::endl;
-                Player.health = Player.health - 10;
-            };
-        };
-        // verifier si la vie est en dessous de 100
-        if (Player.health < 0)
-        {
-            CloseWindow();
-        };
-        // ========================================================
-        // FERMETURE
-        // ========================================================
+            fps =
+                (int)(1.0f / dt);
+        }
+
+        std::string fpsText =
+            "FPS : " +
+            std::to_string(fps);
+
+        DrawText(
+            fpsText.c_str(),
+            screenX - 100,
+            20,
+            15,
+            WHITE);
+
+        // ====================================================
+        // VIE
+        // ====================================================
+
+        std::string playerHealth =
+            "HP : " +
+            std::to_string(
+                (int)Player.health);
+
+        DrawText(
+            playerHealth.c_str(),
+            screenX / 100,
+            20,
+            25,
+            RED);
+
+        // ====================================================
+        // BALLES
+        // ====================================================
+
+        std::string buletsText =
+            "Ammo : " +
+            std::to_string(
+                Player.bulets) +
+            " / " +
+            std::to_string(
+                Player.maxBulets);
+
+        DrawText(
+            buletsText.c_str(),
+            screenX - 150,
+            screenY - 40,
+            25,
+            GREEN);
+
+        // ====================================================
+        // NOMBRE D'ENNEMIS
+        // ====================================================
+
+        std::string enemyText =
+            "Enemies : " +
+            std::to_string(
+                enemies.size());
+
+        DrawText(
+            enemyText.c_str(),
+            20,
+            55,
+            20,
+            PURPLE);
+
+        // ====================================================
+        // NIVEAU DE SPAWN
+        // ====================================================
+
+        std::string spawnText =
+            "Vague : " +
+            std::to_string(
+                numberOfEnemies);
+
+        DrawText(
+            spawnText.c_str(),
+            20,
+            80,
+            20,
+            WHITE);
+
+        EndDrawing();
     }
+
+    // ========================================================
+    // FERMETURE
+    // ========================================================
+
     CloseWindow();
 
     return 0;
-};
+}
