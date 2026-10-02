@@ -13,20 +13,18 @@
 int screenX = 0;
 int screenY = 0;
 
+// nombres de fps
 const int targetFps = 60;
 
+// autres variables
 int numberOfEnemies = 1;
-int maxEnemies = 20;
-const int minEnemies = maxEnemies / 2;
-
-int numberSlidingEnemies = 0;
-int maxSlidingEnnemies = 10;
-
-int numberOfSlidingEnnemies = 0;
-
 long long score = 0;
+int maxNumberOfEnemies = 15;
 
-bool colisions = true;
+// variables sliding enemies
+
+int numberOfSlidingEnemies = 0;
+int maxNumberOfSlidingEnemies = 10;
 
 // ============================================================
 // CALCUL DE DIRECTION
@@ -111,9 +109,6 @@ public:
         float alpha =
             lifetime / maxLifetime;
 
-        if (alpha < 0)
-            alpha = 0;
-
         Color particleColor = color;
 
         particleColor.a =
@@ -124,74 +119,6 @@ public:
             y,
             radius,
             particleColor);
-    }
-};
-
-// ============================================================
-// PROJECTILE
-// ============================================================
-
-class Projectile
-{
-public:
-    float x;
-    float y;
-
-    float velocityX;
-    float velocityY;
-
-    float radius;
-    float speed;
-
-    bool active;
-
-    Projectile(
-        float startX,
-        float startY,
-        float directionX,
-        float directionY)
-    {
-        x = startX;
-        y = startY;
-
-        speed = 900.0f;
-
-        velocityX =
-            directionX * speed;
-
-        velocityY =
-            directionY * speed;
-
-        radius = 7.0f;
-
-        active = true;
-    }
-
-    void update(float dt)
-    {
-        x += velocityX * dt;
-        y += velocityY * dt;
-
-        if (
-            x < -radius ||
-            x > screenX + radius ||
-            y < -radius ||
-            y > screenY + radius)
-        {
-            active = false;
-        }
-    }
-
-    void draw()
-    {
-        if (!active)
-            return;
-
-        DrawCircle(
-            x,
-            y,
-            radius,
-            YELLOW);
     }
 };
 
@@ -248,15 +175,19 @@ public:
 class player
 {
 public:
+    // Position
     float x;
     float y;
 
+    // Taille
     float height;
     float width;
 
+    // Ancienne position
     float previousX;
     float previousY;
 
+    // Physique
     float gravity;
 
     float velocityX;
@@ -267,9 +198,6 @@ public:
 
     float restitution;
     float health;
-
-    float damageCooldown;
-
     Color color;
 
     player(
@@ -289,7 +217,6 @@ public:
         previousY = y;
 
         color = playerColor;
-
         health = 100;
 
         gravity = 500.0f;
@@ -299,10 +226,8 @@ public:
 
         restitution = 0.8f;
 
-        bulets = 5;
-        maxBulets = 5;
-
-        damageCooldown = 0;
+        bulets = 10;
+        maxBulets = 10;
     }
 
     // ========================================================
@@ -311,56 +236,46 @@ public:
 
     void update(float dt)
     {
+        // On sauvegarde la position précédente
         previousX = x;
         previousY = y;
 
-        if (damageCooldown > 0)
-        {
-            damageCooldown -= dt;
-
-            if (damageCooldown < 0)
-                damageCooldown = 0;
-        }
-
+        // Gravité
         velocityY += gravity * dt;
 
+        // Déplacement
         x += velocityX * dt;
         y += velocityY * dt;
 
-        // SOL
-
+        // Sol
         if (y + height >= screenY)
         {
             y = screenY - height;
 
-            velocityY = 0;
-            velocityX = 0;
+            velocityY = 0.0f;
+            velocityX = 0.0f;
+
+            health = health - 1;
         }
 
-        // MUR GAUCHE
-
+        // Mur gauche
         if (x < 0)
         {
             x = 0;
-
             velocityX = 0;
         }
 
-        // MUR DROIT
-
+        // Mur droit
         if (x + width > screenX)
         {
             x = screenX - width;
-
             velocityX = 0;
         }
 
-        // PLAFOND
-
+        // Plafond
         if (y < 0)
         {
             y = 0;
-
             velocityY = 0;
         }
     }
@@ -395,12 +310,14 @@ public:
 
     void checkWallCollision(wall &Wall)
     {
+        // Joueur
         float playerLeft = x;
         float playerRight = x + width;
 
         float playerTop = y;
         float playerBottom = y + height;
 
+        // Mur
         float wallLeft = Wall.x;
         float wallRight =
             Wall.x + Wall.height;
@@ -409,6 +326,7 @@ public:
         float wallBottom =
             Wall.y + Wall.width;
 
+        // Vérifie si les deux rectangles se touchent
         bool collision =
             playerRight > wallLeft &&
             playerLeft < wallRight &&
@@ -417,6 +335,10 @@ public:
 
         if (!collision)
             return;
+
+        // ====================================================
+        // COLLISION PAR LE DESSUS
+        // ====================================================
 
         float previousBottom =
             previousY + height;
@@ -433,6 +355,10 @@ public:
             return;
         }
 
+        // ====================================================
+        // COLLISION PAR LE DESSOUS
+        // ====================================================
+
         float previousTop =
             previousY;
 
@@ -446,6 +372,10 @@ public:
 
             return;
         }
+
+        // ====================================================
+        // COLLISION PAR LA GAUCHE
+        // ====================================================
 
         float previousRight =
             previousX + width;
@@ -463,6 +393,10 @@ public:
 
             return;
         }
+
+        // ====================================================
+        // COLLISION PAR LA DROITE
+        // ====================================================
 
         float previousLeft =
             previousX;
@@ -583,11 +517,12 @@ public:
     }
 
     // ========================================================
-    // DESSIN
+    // DESSIN DU JOUEUR
     // ========================================================
 
     void draw()
     {
+        // Corps
         DrawRectangle(
             x,
             y,
@@ -595,12 +530,14 @@ public:
             height,
             color);
 
+        // Tête
         DrawCircle(
             x + width / 2,
             y,
             width / 2,
             color);
 
+        // Arme
         drawWeapon();
     }
 };
@@ -618,6 +555,7 @@ public:
     float radius;
 
     float gravity;
+
     float velocityY;
 
     float restitution;
@@ -627,40 +565,42 @@ public:
     bool colider;
 
     Ball(
-        float ballX,
-        float ballY,
-        float ballRadius,
-        Color ballColor)
+        float startX,
+        float startY,
+        float startRadius,
+        Color startColor)
     {
-        x = ballX;
-        y = ballY;
+        x = startX;
+        y = startY;
 
-        radius = ballRadius;
+        radius = startRadius;
+
+        color = startColor;
 
         gravity = 500.0f;
 
-        velocityY = 0;
+        velocityY = 0.0f;
 
         restitution = 0.8f;
-
-        color = ballColor;
 
         colider = true;
     }
 
     void update(float dt)
     {
+        // Gravité
         velocityY += gravity * dt;
 
+        // Déplacement
         y += velocityY * dt;
 
+        // Collision avec le sol
         if (y >= screenY - radius)
         {
             y = screenY - radius;
 
             velocityY =
-                -velocityY *
-                restitution;
+                -velocityY * restitution;
         }
     }
 
@@ -675,7 +615,7 @@ public:
 };
 
 // ============================================================
-// TIR DE PARTICULES
+// PARTICULES DE TIR
 // ============================================================
 
 void shootParticles(
@@ -716,13 +656,21 @@ void shootParticles(
     for (int i = 0; i < 8; i++)
     {
         float randomX =
-            GetRandomValue(-30, 30) / 10.0f;
+            (float)GetRandomValue(
+                -30,
+                30) /
+            10.0f;
 
         float randomY =
-            GetRandomValue(-30, 30) / 10.0f;
+            (float)GetRandomValue(
+                -30,
+                30) /
+            10.0f;
 
         float speed =
-            GetRandomValue(100, 250);
+            GetRandomValue(
+                100,
+                250);
 
         float velocityX =
             dx * speed +
@@ -741,7 +689,7 @@ void shootParticles(
 }
 
 // ============================================================
-// ENNEMI
+// ENNEMI NORMAL
 // ============================================================
 
 class enemyA
@@ -749,10 +697,11 @@ class enemyA
 public:
     float x;
     float y;
-    float speed;
+
     float radius;
 
     float gravity;
+
     float velocityY;
 
     float restitution;
@@ -772,22 +721,15 @@ public:
 
         radius = enemyRadius;
 
+        color = enemyColor;
+
         gravity = 500.0f;
 
-        velocityY = 0;
+        velocityY = 0.0f;
 
         restitution = 0.8f;
 
-        color = enemyColor;
-
         colider = true;
-    }
-
-    void update(float dt)
-    {
-        speed = 60.0f;
-
-        x -= speed * dt;
     }
 
     void draw()
@@ -798,46 +740,298 @@ public:
             radius,
             color);
     }
+
+    void update()
+    {
+        // Déplacement horizontal
+        x = x - 1;
+    }
 };
 
-//=============================================================
-// SLIDING ENEMY
-//=============================================================
+// ============================================================
+// SPINNING OBJECT
+// ============================================================
+
 class slidingEnemy
 {
 public:
     float x;
     float y;
+
     float h;
     float w;
+
     Color color;
+
     float velocity;
     float rotation;
-    slidingEnemy(float slidingEnemyX, float slidingEnemyY, float slidingEnemyH, float slidingEnemyW, Color slidingEnemyColor)
+
+    slidingEnemy(
+        float slidingEnemyX,
+        float slidingEnemyY,
+        float slidingEnemyH,
+        float slidingEnemyW,
+        Color slidingEnemyColor)
     {
         x = slidingEnemyX;
         y = slidingEnemyY;
+
         h = slidingEnemyH;
         w = slidingEnemyW;
-        rotation = 0;
-        velocity = 5;
+
         color = slidingEnemyColor;
-    };
+
+        velocity = 5.0f;
+
+        rotation = 0.0f;
+    }
+
+    void update(float dt)
+    {
+        // Même vitesse de déplacement
+        // que ton objet d'origine
+        x -= velocity;
+
+        // Rotation
+        rotation += 1.0f;
+
+        if (rotation >= 360.0f)
+        {
+            rotation -= 360.0f;
+        }
+    }
 
     void draw()
     {
         DrawRectanglePro(
-            {x, y, w, h},
-            {w / 2, h / 2},
+            {x,
+             y,
+             w,
+             h},
+            {w / 2,
+             h / 2},
             rotation,
             color);
-    };
-    void update()
-    {
-        x = x - 1 * velocity;
-        rotation = rotation + 1;
-    };
+    }
 };
+
+// ============================================================
+// PROJECTION POUR COLLISION SAT
+// ============================================================
+
+void projectPoints(
+    const std::vector<Vector2> &points,
+    Vector2 axis,
+    float &min,
+    float &max)
+{
+    min =
+        points[0].x * axis.x +
+        points[0].y * axis.y;
+
+    max = min;
+
+    for (size_t i = 1;
+         i < points.size();
+         i++)
+    {
+        float projection =
+            points[i].x * axis.x +
+            points[i].y * axis.y;
+
+        if (projection < min)
+        {
+            min = projection;
+        }
+
+        if (projection > max)
+        {
+            max = projection;
+        }
+    }
+}
+
+// ============================================================
+// COLLISION DES PROJECTIONS
+// ============================================================
+
+bool projectionsOverlap(
+    float minA,
+    float maxA,
+    float minB,
+    float maxB)
+{
+    return maxA >= minB &&
+           maxB >= minA;
+}
+
+// ============================================================
+// COLLISION JOUEUR / SPINNING OBJECT
+// ============================================================
+
+bool playerVsSlidingEnemy(
+    player &Player,
+    slidingEnemy &enemy)
+{
+    // ========================================================
+    // RECTANGLE DU JOUEUR
+    // ========================================================
+
+    std::vector<Vector2> playerPoints;
+
+    playerPoints.push_back(
+        {Player.x,
+         Player.y});
+
+    playerPoints.push_back(
+        {Player.x + Player.width,
+         Player.y});
+
+    playerPoints.push_back(
+        {Player.x + Player.width,
+         Player.y + Player.height});
+
+    playerPoints.push_back(
+        {Player.x,
+         Player.y + Player.height});
+
+    // ========================================================
+    // ANGLE DE L'ENNEMI
+    // ========================================================
+
+    float angle =
+        enemy.rotation *
+        PI /
+        180.0f;
+
+    float cosAngle =
+        cos(angle);
+
+    float sinAngle =
+        sin(angle);
+
+    // ========================================================
+    // DEMI-TAILLES
+    // ========================================================
+
+    float halfW =
+        enemy.w / 2;
+
+    float halfH =
+        enemy.h / 2;
+
+    // ========================================================
+    // POINT LOCAL -> MONDE
+    // ========================================================
+
+    auto rotatePoint =
+        [&](float localX, float localY)
+    {
+        Vector2 point;
+
+        point.x =
+            enemy.x +
+            localX * cosAngle -
+            localY * sinAngle;
+
+        point.y =
+            enemy.y +
+            localX * sinAngle +
+            localY * cosAngle;
+
+        return point;
+    };
+
+    // ========================================================
+    // RECTANGLE TOURNÉ
+    // ========================================================
+
+    std::vector<Vector2> enemyPoints;
+
+    enemyPoints.push_back(
+        rotatePoint(
+            -halfW,
+            -halfH));
+
+    enemyPoints.push_back(
+        rotatePoint(
+            halfW,
+            -halfH));
+
+    enemyPoints.push_back(
+        rotatePoint(
+            halfW,
+            halfH));
+
+    enemyPoints.push_back(
+        rotatePoint(
+            -halfW,
+            halfH));
+
+    // ========================================================
+    // AXES DU SAT
+    // ========================================================
+
+    Vector2 axes[4];
+
+    // Axes du joueur
+    axes[0] =
+        {
+            1,
+            0};
+
+    axes[1] =
+        {
+            0,
+            1};
+
+    // Axes du spinning object
+    axes[2] =
+        {
+            cosAngle,
+            sinAngle};
+
+    axes[3] =
+        {
+            -sinAngle,
+            cosAngle};
+
+    // ========================================================
+    // TEST DES 4 AXES
+    // ========================================================
+
+    for (int i = 0; i < 4; i++)
+    {
+        float playerMin;
+        float playerMax;
+
+        float enemyMin;
+        float enemyMax;
+
+        projectPoints(
+            playerPoints,
+            axes[i],
+            playerMin,
+            playerMax);
+
+        projectPoints(
+            enemyPoints,
+            axes[i],
+            enemyMin,
+            enemyMax);
+
+        if (!projectionsOverlap(
+                playerMin,
+                playerMax,
+                enemyMin,
+                enemyMax))
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
 
 // ============================================================
 // MAIN
@@ -846,17 +1040,11 @@ public:
 int main()
 {
     // ========================================================
-    // FENETRE
+    // FENÊTRE
     // ========================================================
 
-    InitWindow(
-        1280,
-        720,
-        "Physics Simulator");
-
-    // ========================================================
-    // MONITEUR
-    // ========================================================
+    SetConfigFlags(
+        FLAG_WINDOW_UNDECORATED);
 
     int monitorWidth =
         GetMonitorWidth(0);
@@ -864,20 +1052,10 @@ int main()
     int monitorHeight =
         GetMonitorHeight(0);
 
-    // ========================================================
-    // FULLSCREEN WINDOWED
-    // ========================================================
-
-    SetWindowState(
-        FLAG_WINDOW_UNDECORATED);
-
-    SetWindowSize(
+    InitWindow(
         monitorWidth,
-        monitorHeight);
-
-    SetWindowPosition(
-        0,
-        0);
+        monitorHeight,
+        "Physics Simulator");
 
     screenX =
         GetScreenWidth();
@@ -908,13 +1086,7 @@ int main()
         screenX / 2,
         125,
         20,
-        GRAY);
-
-    // ========================================================
-    // PROJECTILES
-    // ========================================================
-
-    std::vector<Projectile> projectiles;
+        RED);
 
     // ========================================================
     // MURS
@@ -922,6 +1094,7 @@ int main()
 
     std::vector<wall> walls;
 
+    // Mur horizontal vert
     walls.emplace_back(
         screenX * 0.26f,
         screenY * 0.60f,
@@ -929,6 +1102,7 @@ int main()
         30,
         GREEN);
 
+    // Mur horizontal rouge
     walls.emplace_back(
         screenX * 0.46f,
         screenY * 0.40f,
@@ -936,6 +1110,7 @@ int main()
         30,
         RED);
 
+    // Mur vertical orange
     walls.emplace_back(
         screenX * 0.06f,
         screenY * 0.10f,
@@ -955,10 +1130,7 @@ int main()
 
     std::vector<enemyA> enemies;
 
-    //=========================================================
-    // Sliding enemies
-    //=========================================================
-
+    // Spinning objects
     std::vector<slidingEnemy> SlidingEnemies;
 
     // ========================================================
@@ -970,15 +1142,6 @@ int main()
 
     auto lastBulletRecharge =
         std::chrono::steady_clock::now();
-
-    auto event =
-        std::chrono::steady_clock::now();
-
-    // ========================================================
-    // FULLSCREEN
-    // ========================================================
-
-    bool trueFullscreen = false;
 
     // ========================================================
     // BOUCLE PRINCIPALE
@@ -992,29 +1155,7 @@ int main()
 
         if (IsKeyPressed(KEY_F11))
         {
-            if (!trueFullscreen)
-            {
-                ToggleFullscreen();
-
-                trueFullscreen = true;
-            }
-            else
-            {
-                ToggleFullscreen();
-
-                SetWindowState(
-                    FLAG_WINDOW_UNDECORATED);
-
-                SetWindowSize(
-                    monitorWidth,
-                    monitorHeight);
-
-                SetWindowPosition(
-                    0,
-                    0);
-
-                trueFullscreen = false;
-            }
+            ToggleFullscreen();
 
             screenX =
                 GetScreenWidth();
@@ -1024,14 +1165,14 @@ int main()
         }
 
         // ====================================================
-        // TEMPS ACTUEL
+        // TEMPS
         // ====================================================
 
         auto now =
             std::chrono::steady_clock::now();
 
         // ====================================================
-        // SPAWN DES ENNEMIS
+        // SPAWN ENNEMIS TOUTES LES 5 SECONDES
         // ====================================================
 
         auto enemyElapsed =
@@ -1042,7 +1183,7 @@ int main()
         if (enemyElapsed.count() >= 5)
         {
             std::cout
-                << "Spawn d'un ennemi"
+                << "spawn d un enemi"
                 << std::endl;
 
             int i = 0;
@@ -1051,99 +1192,70 @@ int main()
                 1 +
                 std::rand() %
                     numberOfEnemies;
-
-            while (i < n)
+            if (numberOfEnemies <= maxNumberOfEnemies)
+            {
+                numberOfEnemies = numberOfEnemies + 1;
+            }
+            while (i != n)
             {
                 enemies.emplace_back(
                     std::rand() % screenY,
-
                     screenX +
                         std::rand() %
                             (screenX / 20),
-
                     5,
-
                     PURPLE);
+
+                score =
+                    score +
+                    numberOfEnemies;
 
                 i++;
             }
 
-            if (numberOfEnemies < maxEnemies)
+            // =================================================
+            // SPINNING OBJECT
+            // =================================================
+
+            // Même taille : 25 x 25
+            // Même couleur : RED
+
+            if (numberOfEnemies == maxNumberOfEnemies)
             {
-                numberOfEnemies++;
-            }
-            if (numberOfEnemies == maxEnemies)
-            {
-
-                for (enemyA &enemy : enemies)
-                {
-                    enemy.speed += enemy.speed / 2.0f;
-                };
-                if (numberOfEnemies >= minEnemies)
+                if (numberOfEnemies % 2 == 0)
                 {
 
-                    maxEnemies = maxEnemies - 1;
-                    numberOfEnemies = numberOfEnemies - 1;
-                };
-
-                // apres ici donc il va faloir spawn les pochains bails la
-                // je dois utiliser le principe de liste
-                SlidingEnemies.emplace_back(screenX, Player.y, 25, 25, RED);
-
-                // incremente le bail pour ajouter les petits enemis
-
-                i = 0;
-                while (i != numberOfSlidingEnnemies)
-                {
+                    // on spawn a la base 1 ennemis sur le y du joueur
                     SlidingEnemies.emplace_back(
-                        std::rand() % screenY,
-
-                        screenX +
-                            std::rand() %
-                                (screenX / 20),
-
+                        screenX + 25,
+                        Player.y +
+                            Player.height / 2,
                         25,
                         25,
-
                         RED);
-                    i = i + 1;
+
+                    i = 0;
+                    while (i < numberOfSlidingEnemies)
+                    {
+
+                        SlidingEnemies.emplace_back(
+                            screenX + 25,
+                            rand() % screenY +
+                                Player.height / 2,
+                            25,
+                            25,
+                            RED);
+                        i = i + 1;
+                    };
+                    if (numberOfSlidingEnemies != maxNumberOfSlidingEnemies)
+                    {
+                        numberOfSlidingEnemies = numberOfSlidingEnemies + 1;
+                    };
                 };
+            }
 
-                if (numberOfSlidingEnnemies < maxSlidingEnnemies)
-                {
-                    numberOfSlidingEnnemies = numberOfSlidingEnnemies + 1;
-                };
-            };
-
-            score += numberOfEnemies;
-
-            lastEnemySpawn = now;
-        }
-
-        // ====================================================
-        // EVENEMENT BOSS
-        // ====================================================
-
-        auto eventSpawnBoss =
-            std::chrono::duration_cast<
-                std::chrono::seconds>(
-                now - event);
-
-        if (eventSpawnBoss.count() >= 30)
-        {
-            std::cout
-                << "================================"
-                << std::endl;
-
-            std::cout
-                << "       EVENT BOSS SPAWN !"
-                << std::endl;
-
-            std::cout
-                << "================================"
-                << std::endl;
-
-            event = now;
+            lastEnemySpawn =
+                now;
         }
 
         // ====================================================
@@ -1163,7 +1275,8 @@ int main()
                 Player.bulets++;
             }
 
-            lastBulletRecharge = now;
+            lastBulletRecharge =
+                now;
         }
 
         // ====================================================
@@ -1183,62 +1296,14 @@ int main()
         {
             if (Player.bulets > 0)
             {
-                // --------------------------------------------
-                // PARTICULES
-                // --------------------------------------------
-
+                // Particules
                 shootParticles(
                     particles,
                     Player);
 
-                // --------------------------------------------
-                // DIRECTION DU PROJECTILE
-                // --------------------------------------------
-
+                // Repousse le joueur
                 Vector2 mouse =
                     GetMousePosition();
-
-                float centerX =
-                    Player.x +
-                    Player.width / 2;
-
-                float centerY =
-                    Player.y +
-                    Player.height / 2;
-
-                float dx =
-                    mouse.x - centerX;
-
-                float dy =
-                    mouse.y - centerY;
-
-                float distance =
-                    sqrt(
-                        dx * dx +
-                        dy * dy);
-
-                if (distance > 0)
-                {
-                    dx /= distance;
-                    dy /= distance;
-
-                    // ----------------------------------------
-                    // CREATION DU PROJECTILE
-                    // ----------------------------------------
-
-                    Vector2 weaponEnd =
-                        Player.getWeaponEnd();
-
-                    projectiles.emplace_back(
-                        weaponEnd.x,
-                        weaponEnd.y,
-                        dx,
-                        dy);
-                }
-
-                // --------------------------------------------
-                // REPOUSSEMENT
-                // --------------------------------------------
 
                 Player.pushBack(
                     mouse.x,
@@ -1274,22 +1339,6 @@ int main()
         }
 
         // ====================================================
-        // UPDATE PROJECTILES
-        // ====================================================
-
-        for (Projectile &projectile : projectiles)
-        {
-            if (projectile.active)
-            {
-                projectile.update(dt);
-            }
-        }
-
-        // ====================================================
-        // COLLISION PROJECTILES / ENNEMIS
-        // ====================================================
-
-        // ====================================================
         // UPDATE PARTICULES
         // ====================================================
 
@@ -1304,26 +1353,80 @@ int main()
 
         for (enemyA &enemy : enemies)
         {
+            enemy.update();
+        }
+
+        // ====================================================
+        // UPDATE SPINNING OBJECTS
+        // ====================================================
+
+        for (
+            slidingEnemy &enemy :
+            SlidingEnemies)
+        {
             enemy.update(dt);
         }
 
-        //=====================================================
-        // Update sliding enemies
-        //========================================================
+        // ====================================================
+        // SUPPRESSION DES PARTICULES MORTES
+        // ====================================================
 
-        for (slidingEnemy &enemy : SlidingEnemies)
+        for (
+            int i =
+                particles.size() - 1;
+            i >= 0;
+            i--)
         {
-
-            enemy.update();
-        };
+            if (particles[i].isDead())
+            {
+                particles.erase(
+                    particles.begin() + i);
+            }
+        }
 
         // ====================================================
-        // COLLISION JOUEUR / ENNEMIS
+        // SUPPRESSION DES ENNEMIS SORTIS
+        // ====================================================
+
+        for (
+            int i =
+                enemies.size() - 1;
+            i >= 0;
+            i--)
+        {
+            if (enemies[i].x < -100)
+            {
+                enemies.erase(
+                    enemies.begin() + i);
+            }
+        }
+
+        // ====================================================
+        // SUPPRESSION DES SPINNING OBJECTS
+        // ====================================================
+
+        for (
+            int i =
+                SlidingEnemies.size() - 1;
+            i >= 0;
+            i--)
+        {
+            if (
+                SlidingEnemies[i].x <
+                -100)
+            {
+                SlidingEnemies.erase(
+                    SlidingEnemies.begin() + i);
+            }
+        }
+
+        // ====================================================
+        // COLLISION JOUEUR / ENNEMIS NORMAUX
         // ====================================================
 
         for (enemyA &enemy : enemies)
         {
-            bool collision =
+            if (
                 Player.x <
                     enemy.x +
                         enemy.radius &&
@@ -1340,68 +1443,43 @@ int main()
                 Player.y +
                         Player.height >
                     enemy.y -
-                        enemy.radius;
-
-            if (collision)
+                        enemy.radius)
             {
-                if (Player.damageCooldown <= 0)
-                {
-                    std::cout
-                        << "COLLISION !"
-                        << std::endl;
+                std::cout
+                    << "COLLISION !"
+                    << std::endl;
 
-                    Player.health -= 10;
-
-                    if (Player.health < 0)
-                        Player.health = 0;
-
-                    Player.damageCooldown =
-                        0.5f;
-                }
+                Player.health =
+                    Player.health - 10;
             }
         }
 
         // ====================================================
-        // SUPPRESSION PARTICULES
+        // COLLISION JOUEUR / SPINNING OBJECT
         // ====================================================
 
         for (
-            int i = particles.size() - 1;
-            i >= 0;
-            i--)
+            slidingEnemy &enemy :
+            SlidingEnemies)
         {
-            if (particles[i].isDead())
+            if (
+                playerVsSlidingEnemy(
+                    Player,
+                    enemy))
             {
-                particles.erase(
-                    particles.begin() + i);
+                std::cout
+                    << "COLLISION SPINNING OBJECT !"
+                    << std::endl;
+
+                // 30 dégâts
+                Player.health =
+                    Player.health - 30;
+
+                // On repousse légèrement
+                // le joueur pour éviter
+                // plusieurs collisions
+                Player.velocityX = -250;
             }
-        }
-
-        // ====================================================
-        // SUPPRESSION PROJECTILES
-        // ====================================================
-
-        for (
-            int i = projectiles.size() - 1;
-            i >= 0;
-            i--)
-        {
-            if (!projectiles[i].active)
-            {
-                projectiles.erase(
-                    projectiles.begin() + i);
-            }
-        }
-
-        // ====================================================
-        // GAME OVER
-        // ====================================================
-
-        if (Player.health <= 0)
-        {
-            CloseWindow();
-
-            return 0;
         }
 
         // ====================================================
@@ -1425,15 +1503,6 @@ int main()
         for (Ball &ball : balls)
         {
             ball.draw();
-        }
-
-        // ====================================================
-        // PROJECTILES
-        // ====================================================
-
-        for (Projectile &projectile : projectiles)
-        {
-            projectile.draw();
         }
 
         // ====================================================
@@ -1463,18 +1532,23 @@ int main()
             enemy.draw();
         }
 
-        for (slidingEnemy &enemy : SlidingEnemies)
-        {
+        // ====================================================
+        // SPINNING OBJECTS
+        // ====================================================
 
+        for (
+            slidingEnemy &enemy :
+            SlidingEnemies)
+        {
             enemy.draw();
-        };
+        }
 
         // ====================================================
         // SCORE
         // ====================================================
 
         std::string scoreMessage =
-            "Score : " +
+            "ton score " +
             std::to_string(score);
 
         DrawText(
@@ -1512,7 +1586,6 @@ int main()
         // ====================================================
 
         std::string playerHealth =
-            "HP : " +
             std::to_string(
                 (int)Player.health);
 
@@ -1528,53 +1601,33 @@ int main()
         // ====================================================
 
         std::string buletsText =
-            "Ammo : " +
             std::to_string(
-                Player.bulets) +
+                (int)Player.bulets) +
             " / " +
             std::to_string(
-                Player.maxBulets);
+                (int)Player.maxBulets);
 
         DrawText(
             buletsText.c_str(),
-            screenX - 150,
+            screenX - 100,
             screenY - 40,
             25,
             GREEN);
 
-        // ====================================================
-        // NOMBRE D'ENNEMIS
-        // ====================================================
-
-        std::string enemyText =
-            "Enemies : " +
-            std::to_string(
-                enemies.size());
-
-        DrawText(
-            enemyText.c_str(),
-            20,
-            55,
-            20,
-            PURPLE);
-
-        // ====================================================
-        // NIVEAU DE SPAWN
-        // ====================================================
-
-        std::string spawnText =
-            "Vague : " +
-            std::to_string(
-                numberOfEnemies);
-
-        DrawText(
-            spawnText.c_str(),
-            20,
-            80,
-            20,
-            WHITE);
-
         EndDrawing();
+
+        // ====================================================
+        // GAME OVER
+        // ====================================================
+
+        if (Player.health <= 0)
+        {
+            std::cout
+                << "GAME OVER"
+                << std::endl;
+
+            break;
+        }
     }
 
     // ========================================================
